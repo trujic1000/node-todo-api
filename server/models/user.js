@@ -42,17 +42,15 @@ UserSchema.methods.toJSON = function () {
 };
 
 // Instance method for generating authentication token
-UserSchema.methods.generateAuthToken = function () {
+UserSchema.methods.generateAuthToken = async function () {
   const user = this;
   const access = 'auth';
   const token = jwt.sign({_id: user._id.toHexString(), access}, process.env.JWT_SECRET).toString();
 
   user.tokens = user.tokens.concat([{access, token}]);
 
-  return user.save()
-    .then(() => {
-      return token;
-    });
+  await user.save();
+  return token;
 };
 
 // Remove Token instance method
@@ -85,8 +83,9 @@ UserSchema.statics.findByToken = function (token) {
 };
 
 UserSchema.pre('save', function (next) {
-  var user = this;
+  const user = this;
 
+  // If password is modified, generate salt and hash password
   if (user.isModified('password')) {
     bcrypt.genSalt(10, (err, salt) => {
       bcrypt.hash(user.password, salt, (err, hash) => {
@@ -99,27 +98,38 @@ UserSchema.pre('save', function (next) {
   }
 });
 
-UserSchema.statics.findByCredentials = function (email, password) {
+// Find User by email
+UserSchema.statics.findByCredentials = async function (email, password) {
   const User = this;
 
+  const user = await User.findOne({ email });
+  // If user not found, reject it
+  if (!user) { return Promise.reject(); } 
+  // If it exists, check password
+  return new Promise((resolve, reject ) => {
+    bcrypt.compare(password, user.password, (err, res) => {
+      res ? resolve(user) : reject();
+    });
+  });
+
   // Find a user via email
-  return User.findOne({email})
-    .then(user => {
-      // If user doesnt exist, reject
-      if (!user) {
-        return Promise.reject();
-      }
-      // If exists, check password
-      return new Promise((resolve, reject) => {
-        bcrypt.compare(password, user.password, (err, res) => {
-          if (res) {
-            resolve(user);
-          } else {
-            reject();
-          }
-        });
-      });
-    })
+  // return User.findOne({email})
+  //   .then(user => {
+  //     // If user doesnt exist, reject
+  //     if (!user) {
+  //       return Promise.reject();
+  //     }
+  //     // If exists, check password
+  //     return new Promise((resolve, reject) => {
+  //       bcrypt.compare(password, user.password, (err, res) => {
+  //         if (res) {
+  //           resolve(user);
+  //         } else {
+  //           reject();
+  //         }
+  //       });
+  //     });
+  //   })
 };
 
 const User = mongoose.model('User', UserSchema);

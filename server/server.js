@@ -113,14 +113,27 @@ app.post('/users', (req, res) => {
   const body = _.pick(req.body, ['email', 'password']);
   const user = new User(body);
 
-  user.save()
-    .then(() => {
-      return user.generateAuthToken();
-    })
-    .then(token => {
+  // USING ASYNC / AWAIT
+  (async function saveUser (){
+    try {
+      await user.save();
+      const token = await user.generateAuthToken();
       res.header('x-auth', token).send(user);
-    })
-    .catch(err => res.status(400).send());
+    } catch (err) {
+      res.status(400).send('Email already exists, try new one!');
+    }
+  })();
+
+  // USING PROMISES
+  // user.save()
+  //   .then(() => {
+  //     return user.generateAuthToken();
+  //   })
+  //   .then(token => {
+  //     res.header('x-auth', token).send(user);
+  //   })
+  //   .catch(err => res.status(400).send());
+
 });
 
 app.get('/users/me', authenticate, (req, res) => {
@@ -131,26 +144,47 @@ app.get('/users/me', authenticate, (req, res) => {
 app.post('/users/login', (req, res) => {
   // Grabbing email and password from request
   const { email, password } = req.body;
-  // 
-  User.findByCredentials(email, password)
-    .then(user => {
-      // Generate token and send it to header
-      return user.generateAuthToken().then(token => {
-        res.header('x-auth', token).send(user);
-      });
-    })
-    .catch(err => {
-      res.status(400).send();
-    });
+  // ASYNC / AWAIT
+  (async function findUser () {
+    try {
+      // Find user by Credentials
+      const user = await User.findByCredentials(email, password);
+      const token = await user.generateAuthToken();
+      res.header('x-auth', token).send(user);
+    } catch (err) {
+      res.status(400).send('User not found!');
+    }
+  })();
+
+  // User.findByCredentials(email, password)
+  //   .then(user => {
+  //     // Generate token and send it to header
+  //     return user.generateAuthToken().then(token => {
+  //       res.header('x-auth', token).send(user);
+  //     });
+  //   })
+  //   .catch(err => {
+  //     res.status(400).send();
+  //   });
 });
 
 app.delete('/users/me/token', authenticate, (req, res) => {
-  req.user.removeToken(req.token)
-    .then(() => {
-      res.status(200).send();
-    }, () => {
-      res.status(400).send();
-    });
+
+  (async function removeToken () {
+    try {
+      await req.user.removeToken(req.token);
+      res.status(200).send('Token sucessfully deleted');
+    } catch (err) {
+      res.status(400).send('Token not deleted');
+    }
+  })();
+  
+  // req.user.removeToken(req.token)
+  //   .then(() => {
+  //     res.status(200).send();
+  //   }, () => {
+  //     res.status(400).send();
+  //   });
 });
 
 app.listen(port, () => {
